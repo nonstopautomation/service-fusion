@@ -174,6 +174,9 @@ class ServiceFusionClient:
                     customer_updated = customer.updated_at_datetime
                     # ↑ This can raise AttributeError or ValueError if data is bad
 
+                    print(
+                        f"DEBUG: Customer {customer.id} updated={customer_updated.isoformat()}, newer={customer_updated > since}"
+                    )
                     # If customer is newer than our cutoff, include it
                     if customer_updated > since:
                         updated_customers.append(customer)
