@@ -743,7 +743,7 @@ async def upload_contact_to_service_fusion(request: Request):
     # Only add emails if we have an email
 
     if email:
-        contact["emails"] = [{"email": email, "class": "Work"}]
+        contact["emails"] = [{"email": email, "class": "Business"}]
 
     # Map GHL → SF customer payload
 
