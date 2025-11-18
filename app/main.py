@@ -754,24 +754,25 @@ async def upload_contact_to_service_fusion(request: Request):
 
     # Only add locations if GHL provides one
 
-    if loc := data.get("location"):
-        if loc.get("address") or loc.get("city"):
-            sf_payload["locations"] = [
-                {
-                    "street_1": loc.get("address", ""),
-                    "city": loc.get("city", ""),
-                    "state_prov": loc.get("state", ""),
-                    "postal_code": loc.get("postalCode", ""),
-                    "country": loc.get("country", "US"),
-                    "is_primary": True,
-                }
-            ]
+    street = data.get("address1", "") or data.get("Contact Street Address", "")
+    city = data.get("city", "") or data.get("Contact City", "")
+    state = data.get("state", "") or data.get("Contact State", "")
+    postal = data.get("postal_code", "") or data.get("Contact Postal Code", "")
+    country = data.get("country", "US")
+    # Only build address if there is at least a street or city
+    if street or city:
+        sf_payload["locations"] = [
+            {
+                "street_1": street,
+                "city": city,
+                "state_prov": state,
+                "postal_code": postal,
+                "country": country,
+                "is_primary": True,
+            }
+        ]
 
     try:
-        import json
-
-        print("SF Payload:", json.dumps(sf_payload, indent=2))
-
         created = await sf_client.create_customer(sf_payload)
 
         return {"status": "created", "service_fusion": created}
