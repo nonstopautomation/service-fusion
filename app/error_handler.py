@@ -77,17 +77,8 @@ class SlackNotifier:
             # Get traceback
             tb = traceback.format_exc()
 
-            # Determine emoji based on severity
-            emoji_map = {
-                ErrorSeverity.LOW: "⚠️",
-                ErrorSeverity.MEDIUM: "🔴",
-                ErrorSeverity.HIGH: "🚨",
-                ErrorSeverity.CRITICAL: "💥",
-            }
-            emoji = emoji_map.get(severity, "⚠️")
-
             # Build readable message
-            formatted_message = f"{emoji} Service Fusion Sync Error\n\n"
+            formatted_message = f"Service Fusion Sync Error\n\n"
             formatted_message += f"Severity: {severity.value.upper()}\n"
             formatted_message += f"Function: {function_name}\n"
             formatted_message += f"Error Type: {error_type}\n"
@@ -121,16 +112,16 @@ class SlackNotifier:
             )
 
             if response.status_code == 200:
-                logging.info(f"✅ Slack notification sent for {function_name}")
+                logging.info(f"Slack notification sent for {function_name}")
             else:
                 logging.warning(
-                    f"⚠️  Slack notification failed: {response.status_code} - {response.text}"
+                    f"Slack notification failed: {response.status_code} - {response.text}"
                 )
 
         except Exception as e:
             # Don't let Slack notification failures break the app
             logging.warning(
-                f"⚠️  Could not send Slack notification: {e}\n"
+                f"Could not send Slack notification: {e}\n"
                 f"   (This is expected if hooks.slack.com is not in allowed domains)\n"
                 f"   Error was logged locally instead."
             )
@@ -235,14 +226,14 @@ def safe_scheduled_job(func):
         job_name = func.__name__
 
         try:
-            logging.info(f"🚀 Starting scheduled job: {job_name}")
+            logging.info(f"Starting scheduled job: {job_name}")
             result = await func(*args, **kwargs)
-            logging.info(f"✅ Completed scheduled job: {job_name}")
+            logging.info(f"Completed scheduled job: {job_name}")
             return result
 
         except Exception as e:
             # Log with full traceback
-            logging.error(f"❌ Scheduled job '{job_name}' failed: {e}", exc_info=True)
+            logging.error(f"Scheduled job '{job_name}' failed: {e}", exc_info=True)
 
             # Notify via Slack
             await slack_notifier.send_error(
@@ -258,7 +249,7 @@ def safe_scheduled_job(func):
 
             # Print user-friendly console message
             print(f"\n{'=' * 80}")
-            print(f"❌ Scheduled job '{job_name}' failed")
+            print(f"Scheduled job '{job_name}' failed")
             print(f"   Error: {type(e).__name__}: {e}")
             print(f"   Scheduler continues - will retry on next interval")
             print(f"{'=' * 80}\n")

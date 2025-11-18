@@ -92,7 +92,7 @@ class ServiceFusionClient:
             self.access_token = data["access_token"]
             self.token_expiry = time.time() + int(data["expires_in"]) - 300
 
-            print(f"🔑 Got new SF access token (expires in {data['expires_in']}s)")
+            print(f"Got new SF access token (expires in {data['expires_in']}s)")
             return self.access_token
 
     async def get_customers(
@@ -186,7 +186,7 @@ class ServiceFusionClient:
                     # Data quality issue with this specific customer
                     # Log it, add to batch, and continue processing other customers
                     print(
-                        f"⚠️  Skipping customer {customer.id} - bad data: {type(e).__name__}: {e}"
+                        f"Skipping customer {customer.id} - bad data: {type(e).__name__}: {e}"
                     )
 
                     bad_customers.append(
@@ -338,7 +338,7 @@ class ServiceFusionClient:
                     # Data quality issue with this specific job
                     # Log it, add to batch, and continue processing other jobs
                     print(
-                        f"⚠️  Skipping job {job.id} - bad data: {type(e).__name__}: {e}"
+                        f"Skipping job {job.id} - bad data: {type(e).__name__}: {e}"
                     )
 
                     bad_jobs.append(
@@ -462,7 +462,7 @@ class ServiceFusionClient:
 
                 except (AttributeError, ValueError, TypeError) as e:
                     print(
-                        f"⚠️  Skipping estimate {estimate.id} - bad data: {type(e).__name__}: {e}"
+                        f"Skipping estimate {estimate.id} - bad data: {type(e).__name__}: {e}"
                     )
 
                     bad_estimates.append(

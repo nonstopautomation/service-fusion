@@ -12,8 +12,8 @@ async def test_slack_notification():
     notifier = SlackNotifier()
 
     try:
-        print("🧪 Testing Slack notification...")
-        print(f"📡 Webhook URL: {notifier.WEBHOOK_URL}\n")
+        print("Testing Slack notification...")
+        print(f"Webhook URL: {notifier.WEBHOOK_URL}\n")
 
         # Create a test error
         test_error = Exception("This is a test error from Service Fusion sync")
@@ -31,10 +31,10 @@ async def test_slack_notification():
             },
         )
 
-        print("✅ Notification sent! Check your Slack channel.\n")
+        print("Notification sent! Check your Slack channel.\n")
 
     except Exception as e:
-        print(f"❌ Error sending notification: {e}\n")
+        print(f"Error sending notification: {e}\n")
         import traceback
 
         traceback.print_exc()

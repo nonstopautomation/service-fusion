@@ -38,7 +38,7 @@ async def handle_sf_customer_update(customer: SFCustomer):
     print(customer)
     # Skip if no phone or email
     if not customer.phone and not customer.email:
-        print("  ⏭️  Skipping - no phone or email")
+        print("  Skipping - no phone or email")
         print()
         return
 
@@ -85,7 +85,7 @@ async def handle_sf_customer_update(customer: SFCustomer):
         await ghl_client.upsert_contact(contact_data)
 
     except Exception as e:
-        print(f"  ❌ Error syncing customer {customer.id}: {e}")
+        print(f"  Error syncing customer {customer.id}: {e}")
         print()
         raise
 
@@ -120,7 +120,7 @@ async def check_for_customer_updates():
 
         except Exception as e:
             # ONE customer failed - log it and continue with others
-            print(f"  ❌ Failed to sync customer {customer.id}: {e}")
+            print(f"  Failed to sync customer {customer.id}: {e}")
             sync_errors.append({"customer_id": customer.id, "error": str(e)})
             # DON'T re-raise - continue to next customer
 
@@ -161,13 +161,13 @@ async def check_for_customer_updates():
     if customers:
         success_count = len(customers) - len(sync_errors)
         print(
-            f"✅ Check complete - {success_count}/{len(customers)} customer(s) synced"
+            f"Check complete - {success_count}/{len(customers)} customer(s) synced"
         )
         if sync_errors:
-            print(f"⚠️  {len(sync_errors)} error(s) occurred - check Slack for details")
+            print(f"{len(sync_errors)} error(s) occurred - check Slack for details")
     else:
-        print("ℹ️  Check complete - No updates found")
-    print(f"📊 Total checks: {total_checks} | Total updates found: {total_updates}")
+        print("Check complete - No updates found")
+    print(f"Total checks: {total_checks} | Total updates found: {total_updates}")
     print(f"{'=' * 80}\n")
 
 
@@ -185,7 +185,7 @@ async def find_converted_estimate_for_job(job: SFJob) -> Optional[int]:
     if not job.created_at or job.created_at != job.updated_at:
         return None  # Job has been updated since creation, not a fresh conversion
 
-    print(f"  🔍 Checking if job came from converted estimate...")
+    print(f"  Checking if job came from converted estimate...")
 
     # Get recent estimates for this customer (last 2 hours to be safe)
     from datetime import timedelta
@@ -208,15 +208,15 @@ async def find_converted_estimate_for_job(job: SFJob) -> Optional[int]:
                 and estimate.updated_at
                 == job.updated_at  # Exact same timestamp string!
             ):
-                print(f"  🎯 MATCH FOUND: Estimate #{estimate.id} → Job #{job.id}")
+                print(f"  MATCH FOUND: Estimate #{estimate.id} → Job #{job.id}")
                 print(f"     Both updated at: {job.updated_at}")
                 return estimate.id
 
-        print("  ℹ️  No matching estimate found - treating as new job")
+        print("  No matching estimate found - treating as new job")
         return None
 
     except Exception as e:
-        print(f"  ⚠️  Error checking for converted estimate: {e}")
+        print(f"  Error checking for converted estimate: {e}")
         return None  # Fail gracefully - treat as new job
 
 
@@ -246,17 +246,17 @@ async def sync_work_order_to_ghl(
     ghl_stage_id = sf_to_ghl_stage_map.get(work_order.status)
 
     if not ghl_stage_id:
-        print(f"  ⚠️  Unknown SF status: '{work_order.status}' - skipping")
+        print(f"  Unknown SF status: '{work_order.status}' - skipping")
         print()
         return
 
     try:
         # Step 1: Get SF customer data
-        print("  📋 Fetching SF customer data...")
+        print("  Fetching SF customer data...")
         sf_customer = await sf_client.get_customer_by_id(work_order.customer_id)
 
         if not sf_customer:
-            print(f"  ❌ Customer {work_order.customer_id} not found in Service Fusion")
+            print(f"  Customer {work_order.customer_id} not found in Service Fusion")
             print()
             raise JobSyncError(
                 message=f"Customer {work_order.customer_id} does not exist",
@@ -270,7 +270,7 @@ async def sync_work_order_to_ghl(
 
         # Validate contact info
         if not sf_customer.phone and not sf_customer.email:
-            print("  ⚠️  Customer has no phone or email - skipping")
+            print("  Customer has no phone or email - skipping")
             print()
             await slack_notifier.send_error(
                 error=Exception(
@@ -286,26 +286,26 @@ async def sync_work_order_to_ghl(
             return
 
         # Step 2: Find/create contact
-        print("  🔍 Looking up GHL contact...")
+        print("  Looking up GHL contact...")
         ghl_contact = None
 
         if sf_customer.phone:
-            print("  🔍 Searching by phone...")
+            print("  Searching by phone...")
             ghl_contact = await ghl_client.search_contact_by_phone(sf_customer.phone)
 
         if not ghl_contact and sf_customer.email:
-            print("  🔍 Searching by email...")
+            print("  Searching by email...")
             ghl_contact = await ghl_client.search_contact_by_email(sf_customer.email)
 
         if ghl_contact:
-            print("  ✏️  Found contact, adding SF customer ID...")
+            print("  Found contact, adding SF customer ID...")
             await ghl_client.update_contact_custom_field(
                 ghl_contact["id"],
                 settings.ghl_sf_customer_id_field,
                 str(sf_customer.id),
             )
         else:
-            print("  ➕ Creating new GHL contact...")
+            print("  Creating new GHL contact...")
             contact_data = {
                 "firstName": sf_customer.first_name,
                 "lastName": sf_customer.last_name,
@@ -319,9 +319,9 @@ async def sync_work_order_to_ghl(
 
             contact = await ghl_client.upsert_contact(contact_data)
             ghl_contact = {"id": contact.id}
-            print(f"  ✅ Created contact {ghl_contact['id']}")
+            print(f"  Created contact {ghl_contact['id']}")
 
-        print(f"  ✅ Using contact {ghl_contact['id']}")
+        print(f"  Using contact {ghl_contact['id']}")
 
         # Extract contact_id for use in opportunity lookups
         contact_id = ghl_contact.get("id")
@@ -341,16 +341,16 @@ async def sync_work_order_to_ghl(
         if converted_from_estimate_id:
             # This job was converted from an estimate - find the existing opportunity
             print(
-                f"  🔄 Looking for opportunity from converted Estimate #{converted_from_estimate_id}..."
+                f"  Looking for opportunity from converted Estimate #{converted_from_estimate_id}..."
             )
             opportunity = await ghl_client.search_opportunity_by_job_id(
                 converted_from_estimate_id, contact_id
             )
 
             if opportunity:
-                print(f"  ✅ Found estimate's opportunity {opportunity['id']}")
+                print(f"  Found estimate's opportunity {opportunity['id']}")
                 print(
-                    f"  🔄 Updating crm_job_id: {converted_from_estimate_id} → {work_order.id}"
+                    f"  Updating crm_job_id: {converted_from_estimate_id} → {work_order.id}"
                 )
 
                 # Update the custom field to the new job ID
@@ -360,13 +360,13 @@ async def sync_work_order_to_ghl(
                 # Keep opportunity reference so we can update the stage below
             else:
                 print(
-                    "  ⚠️  Estimate opportunity not found - will create new job opportunity"
+                    "  Estimate opportunity not found - will create new job opportunity"
                 )
 
         # ONLY search if we don't already have an opportunity from the conversion
         if not opportunity:
             # Normal flow: look up by current work order ID
-            print("  🔍 Looking up GHL opportunity...")
+            print("  Looking up GHL opportunity...")
             print(f"      Contact ID: {contact_id}")
             print(f"      Work Order ID: {work_order.id}")
 
@@ -375,14 +375,14 @@ async def sync_work_order_to_ghl(
             )
 
             if opportunity:
-                print(f"      ✅ Found existing opportunity: {opportunity['id']}")
+                print(f"      Found existing opportunity: {opportunity['id']}")
             else:
-                print("      ❌ No existing opportunity found - will create new")
+                print("      No existing opportunity found - will create new")
 
         # Step 4: Create or update opportunity
         if not opportunity:
             # Create new opportunity using POST (not upsert)
-            print("  ➕ Creating new opportunity...")
+            print("  Creating new opportunity...")
             opp_data = {
                 "contactId": contact_id,
                 "pipelineId": settings.ghl_pipeline_id,
@@ -398,16 +398,16 @@ async def sync_work_order_to_ghl(
             }
 
             opportunity = await ghl_client.create_opportunity(opp_data)
-            print(f"  ✅ Created opportunity {opportunity.get('id')}")
+            print(f"  Created opportunity {opportunity.get('id')}")
         else:
             # Update existing opportunity stage
             current_stage = opportunity.get("pipelineStageId")
 
             if current_stage == ghl_stage_id:
-                print("  ℹ️  Opportunity stage already correct")
+                print("  Opportunity stage already correct")
             else:
                 print(
-                    f"  🔄 Updating opportunity stage: {current_stage} → {ghl_stage_id}"
+                    f"  Updating opportunity stage: {current_stage} → {ghl_stage_id}"
                 )
                 await ghl_client.update_opportunity(
                     opportunity["id"],
@@ -416,18 +416,18 @@ async def sync_work_order_to_ghl(
                         "status": "open",
                     },
                 )
-                print("  ✅ Updated opportunity stage")
+                print("  Updated opportunity stage")
 
-        print(f"  📊 Status: {work_order.status} → Stage: {ghl_stage_id}")
+        print(f"  Status: {work_order.status} → Stage: {ghl_stage_id}")
         print()
 
     except JobSyncError:
-        print(f"  ❌ Error syncing {work_type.lower()}")
+        print(f"  Error syncing {work_type.lower()}")
         print()
         raise
 
     except Exception as e:
-        print(f"  ❌ Error syncing {work_type.lower()}")
+        print(f"  Error syncing {work_type.lower()}")
         print()
         raise JobSyncError(
             message=f"Failed to sync {work_type.lower()} {work_order.id}",
@@ -446,7 +446,7 @@ async def check_for_job_updates():
     """Poll Service Fusion for updated jobs and sync to GHL"""
 
     print(f"\n{'=' * 80}")
-    print(f"🔍 Checking for JOB updates - {datetime.now(timezone.utc).isoformat()}")
+    print(f"Checking for JOB updates - {datetime.now(timezone.utc).isoformat()}")
     print(f"{'=' * 80}\n")
 
     # ═══════════════════════════════════════════════════════════════
@@ -456,12 +456,12 @@ async def check_for_job_updates():
     # Get last poll time for jobs
     last_poll = state_manager.get_last_job_poll_time()
     # ↑ If this fails (corrupted state file), error propagates UP to decorator
-    print(f"📅 Last job poll: {last_poll.isoformat()}")
+    print(f"Last job poll: {last_poll.isoformat()}")
 
     # Get updated jobs
     jobs = await sf_client.get_updated_jobs(since=last_poll)
     # ↑ If this fails (SF API down), error propagates UP to decorator
-    print(f"📊 Found {len(jobs)} updated job(s)\n")
+    print(f"Found {len(jobs)} updated job(s)\n")
 
     # ═══════════════════════════════════════════════════════════════
     # INDIVIDUAL JOB SYNC - Handle partial failures
@@ -476,7 +476,7 @@ async def check_for_job_updates():
 
         except JobSyncError as e:
             # ONE job failed - log it and continue with others
-            print(f"  ❌ Failed to sync job {job.id}: {e.message}")
+            print(f"  Failed to sync job {job.id}: {e.message}")
             sync_errors.append(
                 {"job_id": job.id, "job_number": job.number, "error": e.message}
             )
@@ -484,7 +484,7 @@ async def check_for_job_updates():
 
         except Exception as e:
             # Unexpected error - log and continue
-            print(f"  ❌ Unexpected error syncing job {job.id}: {e}")
+            print(f"  Unexpected error syncing job {job.id}: {e}")
             sync_errors.append(
                 {"job_id": job.id, "job_number": job.number, "error": str(e)}
             )
@@ -527,11 +527,11 @@ async def check_for_job_updates():
     print(f"{'=' * 80}")
     if jobs:
         success_count = len(jobs) - len(sync_errors)
-        print(f"✅ Synced {success_count}/{len(jobs)} job update(s)")
+        print(f"Synced {success_count}/{len(jobs)} job update(s)")
         if sync_errors:
-            print(f"⚠️  {len(sync_errors)} error(s) occurred - check Slack for details")
+            print(f"{len(sync_errors)} error(s) occurred - check Slack for details")
     else:
-        print("ℹ️  No job updates found")
+        print("No job updates found")
     print(f"{'=' * 80}\n")
 
 
@@ -541,18 +541,18 @@ async def check_for_estimate_updates():
 
     print(f"\n{'=' * 80}")
     print(
-        f"🔍 Checking for ESTIMATE updates - {datetime.now(timezone.utc).isoformat()}"
+        f"Checking for ESTIMATE updates - {datetime.now(timezone.utc).isoformat()}"
     )
     print(f"{'=' * 80}\n")
 
     # Get last poll time for estimates
     last_poll = state_manager.get_last_estimate_poll_time()
-    print(f"📅 Last estimate poll: {last_poll.isoformat()}")
+    print(f"Last estimate poll: {last_poll.isoformat()}")
 
     # Get updated estimates
     estimates = await sf_client.get_updated_estimates(since=last_poll)
 
-    print(f"📊 Found {len(estimates)} updated estimate(s)\n")
+    print(f"Found {len(estimates)} updated estimate(s)\n")
 
     # Track sync errors
     sync_errors = []
@@ -563,7 +563,7 @@ async def check_for_estimate_updates():
             await sync_work_order_to_ghl(estimate, idx, work_type="Estimate")
 
         except Exception as e:
-            print(f"  ❌ Failed to sync estimate {estimate.id}: {e}")
+            print(f"  Failed to sync estimate {estimate.id}: {e}")
             sync_errors.append(
                 {
                     "estimate_id": estimate.id,
@@ -601,11 +601,11 @@ async def check_for_estimate_updates():
     print(f"{'=' * 80}")
     if estimates:
         success_count = len(estimates) - len(sync_errors)
-        print(f"✅ Synced {success_count}/{len(estimates)} estimate update(s)")
+        print(f"Synced {success_count}/{len(estimates)} estimate update(s)")
         if sync_errors:
-            print(f"⚠️  {len(sync_errors)} error(s) occurred - check Slack for details")
+            print(f"{len(sync_errors)} error(s) occurred - check Slack for details")
     else:
-        print("ℹ️  No estimate updates found")
+        print("No estimate updates found")
     print(f"{'=' * 80}\n")
 
 
@@ -635,7 +635,7 @@ async def lifespan(app: FastAPI):
     )
 
     scheduler.start()
-    print("✅ Scheduler started\n")
+    print("Scheduler started\n")
 
     # Run immediately on startup
     await run_all_syncs()
@@ -643,7 +643,7 @@ async def lifespan(app: FastAPI):
     yield
 
     scheduler.shutdown()
-    print("\n🛑 Scheduler stopped")
+    print("\nScheduler stopped")
 
 
 app = FastAPI(
