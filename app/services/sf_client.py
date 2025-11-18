@@ -114,7 +114,6 @@ class ServiceFusionClient:
             SFCustomersResponse: Parsed response with customers
         """
         token = await self.get_token()
-
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
                 f"{self.base_url}/v1/customers",
@@ -127,7 +126,7 @@ class ServiceFusionClient:
                 },
             )
             response.raise_for_status()
-
+            print(SFCustomersResponse(**response.json()))
             # Parse response with Pydantic
             return SFCustomersResponse(**response.json())
 
@@ -171,11 +170,14 @@ class ServiceFusionClient:
             for customer in response.items:
                 try:
                     # Parse customer's updated_at timestamp
+                    print(
+                        f"DEBUG: Customer {customer.id} RAW updated_at={customer.updated_at}"
+                    )
                     customer_updated = customer.updated_at_datetime
                     # ↑ This can raise AttributeError or ValueError if data is bad
 
                     print(
-                        f"DEBUG: Customer {customer.id} updated={customer_updated.isoformat()}, newer={customer_updated > since}"
+                        f"DEBUG: Customer {customer.id} {customer} updated={customer_updated.isoformat()}, newer={customer_updated > since}"
                     )
                     # If customer is newer than our cutoff, include it
                     if customer_updated > since:

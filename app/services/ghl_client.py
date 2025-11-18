@@ -45,7 +45,7 @@ class GoHighLevelClient:
                 headers=self._headers(),
                 params={
                     "locationId": self.location_id,
-                    f"customField.sf_customer_id": str(sf_customer_id),
+                    "customField.sf_customer_id": str(sf_customer_id),
                 },
             )
             response.raise_for_status()
@@ -137,9 +137,9 @@ class GoHighLevelClient:
         """
         Search for opportunity by SF job ID custom field.
 
-        Since GHL doesn't support filtering by custom fields, we:
-        1. Get all opportunities for the contact
-        2. Filter client-side by crm_job_id custom field
+        Also checks for opportunities with crm_job_id="NEW" as a fallback,
+        which indicates a contact created in GHL that needs to be linked
+        to a newly created SF job/estimate.
 
         Args:
             sf_job_id: Service Fusion job ID
@@ -163,24 +163,38 @@ class GoHighLevelClient:
             opportunities = data.get("opportunities", [])
 
             print(f"      DEBUG - Searching for crm_job_id: {sf_job_id}")
-            print(
-                f"      DEBUG - Found {len(opportunities)} opportunities for contact"
-            )
+            print(f"      DEBUG - Found {len(opportunities)} opportunities for contact")
 
             # Filter by custom field client-side
             crm_job_id_field = settings.ghl_opportunity_crm_job_id_field
+
+            # Track "NEW" opportunities as fallback
+            new_opportunity = None
 
             for opp in opportunities:
                 custom_fields = opp.get("customFields", [])
 
                 for field in custom_fields:
-                    # GHL returns: {'id': '...', 'type': 'string', 'fieldValueString': '...'}
                     field_id = field.get("id")
                     field_value = field.get("fieldValueString") or field.get("value")
 
-                    if field_id == crm_job_id_field and field_value == str(sf_job_id):
-                        print(f"      MATCH FOUND: {opp.get('name')}")
-                        return opp
+                    if field_id == crm_job_id_field:
+                        # Exact match - return immediately
+                        if field_value == str(sf_job_id):
+                            print(f"      MATCH FOUND: {opp.get('name')}")
+                            return opp
+
+                        # Track "NEW" as fallback (first one found)
+                        if field_value == "NEW" and new_opportunity is None:
+                            print(f"      Found NEW opportunity: {opp.get('name')}")
+                            new_opportunity = opp
+
+            # Return "NEW" opportunity if no exact match found
+            if new_opportunity:
+                print(
+                    f"      Using NEW opportunity as fallback: {new_opportunity.get('name')}"
+                )
+                return new_opportunity
 
             print(f"      No match found for crm_job_id: {sf_job_id}")
             return None
@@ -337,9 +351,7 @@ class GoHighLevelClient:
                 return response.json()
 
             except httpx.HTTPStatusError as e:
-                print(
-                    f"  GHL API Error updating opportunity: {e.response.status_code}"
-                )
+                print(f"  GHL API Error updating opportunity: {e.response.status_code}")
                 print(f"  Response: {e.response.text}")
                 raise
 
