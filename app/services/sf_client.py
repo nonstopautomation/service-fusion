@@ -9,7 +9,6 @@ import httpx
 import time
 from datetime import datetime
 from typing import Optional
-
 from app.config import settings
 from app.models import (
     SFCustomer,
@@ -18,6 +17,11 @@ from app.models import (
     SFEstimate,
     SFEstimatesResponse,
     SFJobsResponse,
+)
+
+from app.error_handler import (
+    ErrorSeverity,
+    slack_notifier,
 )
 
 
@@ -337,9 +341,7 @@ class ServiceFusionClient:
                 except (AttributeError, ValueError, TypeError) as e:
                     # Data quality issue with this specific job
                     # Log it, add to batch, and continue processing other jobs
-                    print(
-                        f"Skipping job {job.id} - bad data: {type(e).__name__}: {e}"
-                    )
+                    print(f"Skipping job {job.id} - bad data: {type(e).__name__}: {e}")
 
                     bad_jobs.append(
                         {
@@ -580,6 +582,69 @@ class ServiceFusionClient:
                 if e.response.status_code == 404:
                     return None
                 raise
+
+    async def create_customer(self, customer_data: dict):
+        token = await self.get_token()
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{self.base_url}/v1/customers",
+                headers={"Authorization": f"Bearer {token}"},
+                json=customer_data,
+            )
+
+            response.raise_for_status()
+
+            return response.json()
+
+    async def find_customer_by_email_or_phone(
+        self, email: str | None, phone: str | None
+    ):
+        """Search SF for a customer by email or phone."""
+
+        token = await self.get_token()
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                params = {
+                    "expand": "contacts.phones,contacts.emails,locations",
+                    "per-page": 50,
+                }
+
+                if email:
+                    params["filters[email]"] = email
+
+                if phone:
+                    params["filters[phone]"] = phone
+
+                response = await client.get(
+                    f"{self.base_url}/v1/customers",
+                    headers={"Authorization": f"Bearer {token}"},
+                    params=params,
+                )
+
+                response.raise_for_status()
+
+                data = response.json()
+
+                items = data.get("items", [])
+
+                if not items:
+                    return None
+
+                # Return FIRST match
+
+                return items[0]
+
+        except Exception as e:
+            await slack_notifier.send_error(
+                error=e,
+                function_name="find_customer_by_email_or_phone",
+                severity=ErrorSeverity.CRITICAL,
+                context={"email": email, "phone": phone},
+            )
+
+            raise
 
 
 sf_client = ServiceFusionClient()

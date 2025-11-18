@@ -4,7 +4,7 @@ Service Fusion → GoHighLevel Sync Application
 Syncs customers and jobs from Service Fusion to GoHighLevel.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
@@ -16,7 +16,7 @@ from app.models import SFCustomer, SFJob, SFEstimate
 from typing import Union, Optional
 
 import uvicorn
-
+import httpx
 from app.error_handler import (
     safe_scheduled_job,
     ErrorSeverity,
@@ -160,9 +160,7 @@ async def check_for_customer_updates():
     print(f"\n{'=' * 80}")
     if customers:
         success_count = len(customers) - len(sync_errors)
-        print(
-            f"Check complete - {success_count}/{len(customers)} customer(s) synced"
-        )
+        print(f"Check complete - {success_count}/{len(customers)} customer(s) synced")
         if sync_errors:
             print(f"{len(sync_errors)} error(s) occurred - check Slack for details")
     else:
@@ -185,7 +183,7 @@ async def find_converted_estimate_for_job(job: SFJob) -> Optional[int]:
     if not job.created_at or job.created_at != job.updated_at:
         return None  # Job has been updated since creation, not a fresh conversion
 
-    print(f"  Checking if job came from converted estimate...")
+    print("  Checking if job came from converted estimate...")
 
     # Get recent estimates for this customer (last 2 hours to be safe)
     from datetime import timedelta
@@ -406,9 +404,7 @@ async def sync_work_order_to_ghl(
             if current_stage == ghl_stage_id:
                 print("  Opportunity stage already correct")
             else:
-                print(
-                    f"  Updating opportunity stage: {current_stage} → {ghl_stage_id}"
-                )
+                print(f"  Updating opportunity stage: {current_stage} → {ghl_stage_id}")
                 await ghl_client.update_opportunity(
                     opportunity["id"],
                     {
@@ -540,9 +536,7 @@ async def check_for_estimate_updates():
     """Poll Service Fusion for updated estimates and sync to GHL"""
 
     print(f"\n{'=' * 80}")
-    print(
-        f"Checking for ESTIMATE updates - {datetime.now(timezone.utc).isoformat()}"
-    )
+    print(f"Checking for ESTIMATE updates - {datetime.now(timezone.utc).isoformat()}")
     print(f"{'=' * 80}\n")
 
     # Get last poll time for estimates
@@ -698,6 +692,99 @@ async def get_stats():
     """Get sync statistics"""
     stats = state_manager.get_stats()
     return {"state_file": settings.state_file_path, "stats": stats}
+
+
+@app.post("/upload_contact_to_service_fusion")
+async def upload_contact_to_service_fusion(request: Request):
+    data = await request.json()
+
+    email = data.get("email")
+
+    phone = data.get("phone")
+
+    # Clean phone number for search
+
+    clean_phone = None
+
+    if phone:
+        clean_phone = phone.lstrip("+")
+
+        if len(clean_phone) == 11 and clean_phone.startswith("1"):
+            clean_phone = clean_phone[1:]
+
+    # Check if customer already exists
+
+    existing_customer = await sf_client.find_customer_by_email_or_phone(
+        email, clean_phone
+    )
+
+    if existing_customer:
+        print(f"Customer already exists: {existing_customer.get('id')}")
+
+        return {
+            "status": "exists",
+            "message": "Customer already exists in Service Fusion",
+            "service_fusion": existing_customer,
+        }
+
+    # Build contact with proper handling of optional fields
+
+    contact = {
+        "fname": data.get("first_name", ""),
+        "lname": data.get("last_name", ""),
+        "is_primary": True,
+    }
+
+    # Only add phones if we have a phone number
+
+    if clean_phone:
+        contact["phones"] = [{"phone": clean_phone, "type": "Mobile"}]
+
+    # Only add emails if we have an email
+
+    if email:
+        contact["emails"] = [{"email": email, "class": "Work"}]
+
+    # Map GHL → SF customer payload
+
+    sf_payload = {
+        "customer_name": f"{data.get('first_name', '')} {data.get('last_name', '')}".strip(),
+        "contacts": [contact],
+    }
+
+    # Only add locations if GHL provides one
+
+    if loc := data.get("location"):
+        if loc.get("address") or loc.get("city"):
+            sf_payload["locations"] = [
+                {
+                    "street_1": loc.get("address", ""),
+                    "city": loc.get("city", ""),
+                    "state_prov": loc.get("state", ""),
+                    "postal_code": loc.get("postalCode", ""),
+                    "country": loc.get("country", "US"),
+                    "is_primary": True,
+                }
+            ]
+
+    try:
+        import json
+
+        print("SF Payload:", json.dumps(sf_payload, indent=2))
+
+        created = await sf_client.create_customer(sf_payload)
+
+        return {"status": "created", "service_fusion": created}
+
+    except httpx.HTTPStatusError as e:
+        print(f"SF Error Response: {e.response.text}")
+
+        raise HTTPException(status_code=500, detail=str(e))
+
+    except Exception as e:
+        print(e)
+
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

@@ -3,7 +3,6 @@ Error handling and logging utilities with Slack webhook integration.
 """
 
 import logging
-import traceback
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from functools import wraps
@@ -74,18 +73,15 @@ class SlackNotifier:
             error_type = type(error).__name__
             error_msg = str(error)
 
-            # Get traceback
-            tb = traceback.format_exc()
-
             # Build readable message
-            formatted_message = f"Service Fusion Sync Error\n\n"
+            formatted_message = "Service Fusion Sync Error\n\n"
             formatted_message += f"Severity: {severity.value.upper()}\n"
             formatted_message += f"Function: {function_name}\n"
             formatted_message += f"Error Type: {error_type}\n"
             formatted_message += f"Message: {error_msg}\n"
 
             if context:
-                formatted_message += f"\nContext:\n"
+                formatted_message += "\nContext:\n"
                 for key, value in context.items():
                     # Handle lists/dicts specially
                     if isinstance(value, (list, dict)):
@@ -251,7 +247,7 @@ def safe_scheduled_job(func):
             print(f"\n{'=' * 80}")
             print(f"Scheduled job '{job_name}' failed")
             print(f"   Error: {type(e).__name__}: {e}")
-            print(f"   Scheduler continues - will retry on next interval")
+            print("   Scheduler continues - will retry on next interval")
             print(f"{'=' * 80}\n")
 
             # DON'T re-raise - let scheduler continue
