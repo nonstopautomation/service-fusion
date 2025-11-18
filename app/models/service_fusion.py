@@ -282,27 +282,12 @@ class SFCustomer(BaseModel):
         """
         Parse Service Fusion timestamp.
 
-        SF API returns timestamps with +00:00 but they're actually in
-        the client's local timezone (e.g., America/New_York).
-
-        We need to:
-        1. Parse the timestamp
-        2. Interpret it as SF's timezone (not UTC!)
-        3. Convert to UTC
-        4. Return as timezone-naive for comparison
+        SF API returns timestamps in UTC with +00:00 suffix.
+        We strip the timezone info and return as timezone-naive UTC.
         """
-        # Parse the timestamp (ignoring the lying +00:00)
-        dt_str = self.updated_at.replace("+00:00", "")
-        dt_naive = datetime.fromisoformat(dt_str)
+        dt_str = self.updated_at.replace("+00:00", "").replace("Z", "")
 
-        # Treat it as SF's timezone (not UTC!)
-        dt_sf_tz = dt_naive.replace(tzinfo=settings.sf_tz)
-
-        # Convert to UTC
-        dt_utc = dt_sf_tz.astimezone(timezone.utc)
-
-        # Return timezone-naive UTC (to match state manager)
-        return dt_utc.replace(tzinfo=None)
+        return datetime.fromisoformat(dt_str)
 
     def get_custom_field(self, field_name: str) -> Any:
         """Get custom field value by name"""
