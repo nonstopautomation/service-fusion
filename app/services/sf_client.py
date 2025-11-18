@@ -153,6 +153,7 @@ class ServiceFusionClient:
             Customers with bad data (invalid timestamps, missing fields) are skipped
             and reported via Slack notification in a batch.
         """
+        print(f"DEBUG: Looking for customers updated after {since.isoformat()}")
         updated_customers = []
         bad_customers = []  # Track customers with data quality issues
         page = 1
