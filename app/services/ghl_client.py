@@ -162,9 +162,9 @@ class GoHighLevelClient:
             data = response.json()
             opportunities = data.get("opportunities", [])
 
-            print(f"      🔍 DEBUG - Searching for crm_job_id: {sf_job_id}")
+            print(f"      DEBUG - Searching for crm_job_id: {sf_job_id}")
             print(
-                f"      🔍 DEBUG - Found {len(opportunities)} opportunities for contact"
+                f"      DEBUG - Found {len(opportunities)} opportunities for contact"
             )
 
             # Filter by custom field client-side
@@ -179,10 +179,10 @@ class GoHighLevelClient:
                     field_value = field.get("fieldValueString") or field.get("value")
 
                     if field_id == crm_job_id_field and field_value == str(sf_job_id):
-                        print(f"      ✅ MATCH FOUND: {opp.get('name')}")
+                        print(f"      MATCH FOUND: {opp.get('name')}")
                         return opp
 
-            print(f"      ❌ No match found for crm_job_id: {sf_job_id}")
+            print(f"      No match found for crm_job_id: {sf_job_id}")
             return None
 
     async def upsert_opportunity(self, opportunity_data: dict) -> dict:
@@ -267,8 +267,8 @@ class GoHighLevelClient:
                 return response.json()
 
             except httpx.HTTPStatusError as e:
-                print(f"  ❌ GHL API Error: {e.response.status_code}")
-                print(f"  ❌ Response: {e.response.text}")
+                print(f"  GHL API Error: {e.response.status_code}")
+                print(f"  Response: {e.response.text}")
                 raise
 
     async def update_opportunity_custom_field(
@@ -307,9 +307,9 @@ class GoHighLevelClient:
 
             except httpx.HTTPStatusError as e:
                 print(
-                    f"  ❌ GHL API Error updating custom field: {e.response.status_code}"
+                    f"  GHL API Error updating custom field: {e.response.status_code}"
                 )
-                print(f"  ❌ Response: {e.response.text}")
+                print(f"  Response: {e.response.text}")
                 raise
 
     async def update_opportunity(self, opportunity_id: str, update_data: dict) -> dict:
@@ -338,9 +338,9 @@ class GoHighLevelClient:
 
             except httpx.HTTPStatusError as e:
                 print(
-                    f"  ❌ GHL API Error updating opportunity: {e.response.status_code}"
+                    f"  GHL API Error updating opportunity: {e.response.status_code}"
                 )
-                print(f"  ❌ Response: {e.response.text}")
+                print(f"  Response: {e.response.text}")
                 raise
 
 

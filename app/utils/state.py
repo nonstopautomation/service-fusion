@@ -107,7 +107,7 @@ class StateManager:
                     hours=24
                 )
                 print(
-                    f"🔵 First job poll - checking updates since {first_run.isoformat()}"
+                    f"First job poll - checking updates since {first_run.isoformat()}"
                 )
                 return first_run
 
@@ -117,7 +117,7 @@ class StateManager:
             last_poll_str = data.get("last_job_poll")
 
             if not last_poll_str:
-                print("⚠️  State file missing 'last_job_poll', using 24h fallback")
+                print("State file missing 'last_job_poll', using 24h fallback")
                 return datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
                     hours=24
                 )
@@ -200,7 +200,7 @@ class StateManager:
                     hours=24
                 )
                 print(
-                    f"🟦 First estimate poll — checking updates since {first_run.isoformat()}"
+                    f"First estimate poll — checking updates since {first_run.isoformat()}"
                 )
                 return first_run
 
@@ -212,7 +212,7 @@ class StateManager:
 
             # Missing field fallback
             if not last_poll_str:
-                print("⚠️ State file missing 'last_estimate_poll', using 24h fallback")
+                print("State file missing 'last_estimate_poll', using 24h fallback")
                 return datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
                     hours=24
                 )

@@ -374,5 +374,5 @@ customer.updated_at_datetime  # datetime
 
 # 5. Validation happens automatically
 bad_data = {"items": [{"id": "not_a_number"}]}
-response = SFCustomersResponse(**bad_data)  # ❌ ValidationError!
+response = SFCustomersResponse(**bad_data)  # ValidationError!
 """
