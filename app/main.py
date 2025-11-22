@@ -6,7 +6,7 @@ Syncs customers and jobs from Service Fusion to GoHighLevel.
 
 from fastapi import FastAPI, HTTPException, Request
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
 
 from app.config import settings, sf_to_ghl_stage_map
@@ -697,6 +697,7 @@ async def get_stats():
 @app.post("/upload_contact_to_service_fusion")
 async def upload_contact_to_service_fusion(request: Request):
     data = await request.json()
+    print(data)
 
     email = data.get("email")
 
@@ -786,6 +787,256 @@ async def upload_contact_to_service_fusion(request: Request):
         print(e)
 
         raise HTTPException(status_code=500, detail=str(e))
+
+
+"""
+Unified endpoint that replaces both:
+- /upload_contact_to_service_fusion
+- /create_job_in_service_fusion
+
+This handles both scenarios:
+1. Contact created → Sync to SF as customer only
+2. Contact created + appointment booked → Sync customer + create job
+
+Add this to main.py and remove the old endpoints.
+"""
+
+
+"""
+Fixed unified endpoint with proper dict handling
+Replace the previous version with this one
+"""
+
+
+@app.post("/sync_ghl_to_service_fusion")
+async def sync_ghl_to_service_fusion(request: Request):
+    """
+    Sync GHL contact to Service Fusion.
+
+    - Always creates/finds customer
+    - Always creates a scheduled job
+    - No appointment time lookup (simplified)
+    """
+    data = await request.json()
+    print(f"Received sync request for: {data.get('full_name')}")
+
+    email = data.get("email")
+    phone = data.get("phone")
+
+    # Clean phone number
+    clean_phone = None
+    if phone:
+        clean_phone = phone.lstrip("+")
+        if len(clean_phone) == 11 and clean_phone.startswith("1"):
+            clean_phone = clean_phone[1:]
+
+    # ========================================================================
+    # STEP 1: Find or create customer in Service Fusion
+    # ========================================================================
+    customer = None
+    sf_customer_id = data.get("sf_customer_id")
+
+    try:
+        # Try to use existing SF customer ID
+        if sf_customer_id:
+            print(f"Using existing SF customer ID: {sf_customer_id}")
+            customer_obj = await sf_client.get_customer_by_id(int(sf_customer_id))
+            customer = customer_obj.model_dump() if customer_obj else None
+
+        # Search by email/phone if no ID or customer not found
+        if not customer:
+            customer = await sf_client.find_customer_by_email_or_phone(
+                email, clean_phone
+            )
+
+        # Create new customer if still not found
+        if not customer:
+            print("Customer not found, creating new customer...")
+
+            contact = {
+                "fname": data.get("first_name", ""),
+                "lname": data.get("last_name", ""),
+                "is_primary": True,
+            }
+
+            if clean_phone:
+                contact["phones"] = [{"phone": clean_phone, "type": "Mobile"}]
+
+            if email:
+                contact["emails"] = [{"email": email, "class": "Business"}]
+
+            customer_payload = {
+                "customer_name": f"{data.get('first_name', '')} {data.get('last_name', '')}".strip(),
+                "contacts": [contact],
+            }
+
+            # Add location if available
+            street = data.get("address1", "") or data.get("Contact Street Address", "")
+            city = data.get("city", "") or data.get("Contact City", "")
+            state = data.get("state", "") or data.get("Contact State", "")
+            postal = data.get("postal_code", "") or data.get("Contact Postal Code", "")
+
+            if street or city:
+                customer_payload["locations"] = [
+                    {
+                        "street_1": street,
+                        "city": city,
+                        "state_prov": state,
+                        "postal_code": postal,
+                        "country": data.get("country", "US"),
+                        "is_primary": True,
+                    }
+                ]
+
+            customer = await sf_client.create_customer(customer_payload)
+            print(f"Created new customer: {customer.get('id')}")
+        else:
+            print(f"Found existing customer: {customer.get('id')}")
+
+    except Exception as e:
+        await slack_notifier.send_error(
+            error=e,
+            function_name="sync_ghl_to_service_fusion - customer_creation",
+            severity=ErrorSeverity.CRITICAL,
+            context={
+                "email": email,
+                "phone": clean_phone,
+                "name": data.get("full_name"),
+            },
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to find/create customer: {str(e)}"
+        )
+
+    # ========================================================================
+    # STEP 2: Create the job in Service Fusion
+    # ========================================================================
+    created_job = None
+    customer_name = customer.get("customer_name") or customer.get(
+        "fully_qualified_name"
+    )
+
+    try:
+        # Get service description from custom field
+        service_needed = data.get("customData", {}).get("service_needed", "")
+        if not service_needed:
+            service_needed = data.get("Service Needed", "Service request from GHL")
+
+        # Build job payload (no times, just scheduled status)
+        job_payload = {
+            "customer_name": customer_name,
+            "description": service_needed,
+            "status": "Scheduled",
+        }
+
+        # Add location from customer data if available
+        street = data.get("address1", "") or data.get("Contact Street Address", "")
+        city = data.get("city", "") or data.get("Contact City", "")
+        state = data.get("state", "") or data.get("Contact State", "")
+        postal = data.get("postal_code", "") or data.get("Contact Postal Code", "")
+
+        if street:
+            job_payload["street_1"] = street
+        if city:
+            job_payload["city"] = city
+        if state:
+            job_payload["state_prov"] = state
+        if postal:
+            job_payload["postal_code"] = postal
+
+        # Add contact info to job
+        if data.get("first_name"):
+            job_payload["contact_first_name"] = data.get("first_name")
+        if data.get("last_name"):
+            job_payload["contact_last_name"] = data.get("last_name")
+
+        # Build notes with all relevant info
+        notes = []
+
+        # Add service needed to notes
+        if service_needed and service_needed != "Service request from GHL":
+            notes.append(f"Service needed: {service_needed}")
+
+        # Add any additional details from custom fields
+        if note := data.get("Note"):
+            notes.append(f"Customer note: {note}")
+
+        if additional_details := data.get("Additional details"):
+            notes.append(f"Details: {additional_details}")
+
+        if caller_inquiry := data.get("Caller Service Inquiry"):
+            notes.append(f"Service inquiry: {caller_inquiry}")
+
+        # Add appointment info if available in webhook data
+        if appointment_start := data.get("Appointment Start Date"):
+            notes.append(f"Requested date: {appointment_start}")
+
+        if appointment_time := data.get("Appointment Start Time"):
+            notes.append(f"Requested time: {appointment_time}")
+
+        if notes:
+            job_payload["notes"] = [{"notes": "\n".join(notes)}]
+
+        # Log payload for debugging
+        import json
+
+        print("Job Payload:", json.dumps(job_payload, indent=2, default=str))
+
+        # Create the job
+        created_job = await sf_client.create_job(job_payload)
+
+        print(
+            f"SUCCESS - Created job: {created_job.get('id')} - {created_job.get('number')}"
+        )
+
+    except httpx.HTTPStatusError as e:
+        await slack_notifier.send_error(
+            error=e,
+            function_name="sync_ghl_to_service_fusion - job_creation",
+            severity=ErrorSeverity.HIGH,
+            context={
+                "customer_id": customer.get("id") if customer else None,
+                "customer_name": customer_name,
+                "status_code": e.response.status_code,
+                "response": e.response.text[:500]
+                if hasattr(e.response, "text")
+                else str(e),
+            },
+        )
+        # Don't raise - return success with customer but note job failed
+        print(f"Job creation failed but customer was created: {e}")
+
+    except Exception as e:
+        await slack_notifier.send_error(
+            error=e,
+            function_name="sync_ghl_to_service_fusion - job_creation",
+            severity=ErrorSeverity.HIGH,
+            context={
+                "customer_id": customer.get("id") if customer else None,
+                "customer_name": customer_name,
+            },
+        )
+        print(f"Job creation failed but customer was created: {e}")
+
+    # ========================================================================
+    # Return results
+    # ========================================================================
+    response = {
+        "status": "success",
+        "customer_id": customer.get("id") if customer else None,
+        "customer_name": customer_name,
+        "customer_created": sf_customer_id is None,
+    }
+
+    if created_job:
+        response["job_created"] = True
+        response["job_id"] = created_job.get("id")
+        response["job_number"] = created_job.get("number")
+    else:
+        response["job_created"] = False
+        response["reason"] = "Job creation failed"
+
+    return response
 
 
 if __name__ == "__main__":

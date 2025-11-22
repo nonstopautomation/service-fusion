@@ -652,5 +652,42 @@ class ServiceFusionClient:
 
             raise
 
+    async def create_job(self, job_data: dict):
+        """
+        Create a new job in Service Fusion.
+
+        Args:
+            job_data: Job payload (must include customer_name, description, and status)
+
+        Returns:
+            Created job data
+
+        Raises:
+            httpx.HTTPStatusError: If Service Fusion API returns error
+        """
+        try:
+            token = await self.get_token()
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/v1/jobs",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Content-Type": "application/json",
+                    },
+                    json=job_data,
+                )
+                response.raise_for_status()
+                return response.json()
+
+        except httpx.HTTPStatusError as e:
+            print(f"Service Fusion job creation failed: {e.response.status_code}")
+            print(f"Response: {e.response.text}")
+            raise
+
+        except Exception as e:
+            print(f"Unexpected error creating job: {e}")
+            raise
+
 
 sf_client = ServiceFusionClient()
