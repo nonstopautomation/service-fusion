@@ -689,5 +689,30 @@ class ServiceFusionClient:
             print(f"Unexpected error creating job: {e}")
             raise
 
+    async def get_techs(self):
+        """
+        Get customers from Service Fusion.
+
+        Args:
+            page: Page number (1-indexed)
+            per_page: Results per page (max 50)
+            sort: Sort order (use '-updated_at' for newest first)
+
+        Returns:
+            SFCustomersResponse: Parsed response with customers
+        """
+        token = await self.get_token()
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                f"{self.base_url}/v1/techs",
+                headers={"Authorization": f"Bearer {token}"},
+                params={
+                    "page": 1,
+                    "per-page": 50,
+                },
+            )
+            print(response.json())
+            # Parse response with Pydantic
+
 
 sf_client = ServiceFusionClient()

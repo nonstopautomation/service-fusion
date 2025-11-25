@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
+import pandas as pd
 
 from app.config import settings, sf_to_ghl_stage_map
 from app.services import sf_client, ghl_client
@@ -820,6 +821,9 @@ async def sync_ghl_to_service_fusion(request: Request):
     data = await request.json()
     print(f"Received sync request for: {data.get('full_name')}")
 
+    requested_date = data.get("Requested Date")
+    requested_time = data.get("Requested Time")
+
     email = data.get("email")
     phone = data.get("phone")
 
@@ -928,8 +932,14 @@ async def sync_ghl_to_service_fusion(request: Request):
             "description": service_needed,
             "status": "Scheduled",
         }
+        job_payload["techs_assigned"] = [
+            {
+                "id": "980588604",
+                "first_name": "Pros",
+                "last_name": "Funnel",
+            }
+        ]
 
-        # Add location from customer data if available
         street = data.get("address1", "") or data.get("Contact Street Address", "")
         city = data.get("city", "") or data.get("Contact City", "")
         state = data.get("state", "") or data.get("Contact State", "")
@@ -943,6 +953,25 @@ async def sync_ghl_to_service_fusion(request: Request):
             job_payload["state_prov"] = state
         if postal:
             job_payload["postal_code"] = postal
+
+        if requested_time:
+            # Parse the time
+            time_obj = pd.to_datetime(requested_time, format="%I:%M %p")
+
+            # Start time in military format
+            requested_military_time = time_obj.strftime("%H:%M")
+
+            # End time is 2 hours later
+            end_time = (time_obj + timedelta(hours=2)).strftime("%H:%M")
+
+            job_payload["time_frame_promised_start"] = requested_military_time
+            job_payload["time_frame_promised_end"] = end_time
+
+        if requested_date:
+            formatted_date = pd.to_datetime(requested_date).strftime("%Y-%m-%d")
+
+            job_payload["start_date"] = formatted_date
+            job_payload["end_date"] = formatted_date
 
         # Add contact info to job
         if data.get("first_name"):
@@ -968,10 +997,10 @@ async def sync_ghl_to_service_fusion(request: Request):
             notes.append(f"Service inquiry: {caller_inquiry}")
 
         # Add appointment info if available in webhook data
-        if appointment_start := data.get("Appointment Start Date"):
+        if appointment_start := data.get("Requested Date"):
             notes.append(f"Requested date: {appointment_start}")
 
-        if appointment_time := data.get("Appointment Start Time"):
+        if appointment_time := data.get("Requested Time"):
             notes.append(f"Requested time: {appointment_time}")
 
         if notes:
@@ -1037,6 +1066,11 @@ async def sync_ghl_to_service_fusion(request: Request):
         response["reason"] = "Job creation failed"
 
     return response
+
+
+@app.get("/test")
+async def test():
+    await sf_client.get_techs()
 
 
 if __name__ == "__main__":

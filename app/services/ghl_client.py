@@ -7,6 +7,8 @@ import httpx
 from typing import Optional
 from app.config import settings
 from app.models import GHLContact
+from datetime import datetime, timedelta
+from typing import Optional
 
 
 class GoHighLevelClient:

@@ -111,7 +111,7 @@ settings = Settings()  # type: ignore[arg-type]
 # Single unified mapping for both jobs AND estimates
 sf_to_ghl_stage_map = {
     # Job statuses
-    settings.sf_status_unscheduled: settings.ghl_stage_canceled,  # ← FIXED: Was appointment_request
+    settings.sf_status_unscheduled: settings.ghl_stage_job_scheduled,
     settings.sf_status_cancelled: settings.ghl_stage_canceled,
     settings.sf_status_scheduled: settings.ghl_stage_job_scheduled,
     settings.sf_status_dispatched: settings.ghl_stage_job_scheduled,

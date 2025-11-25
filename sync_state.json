@@ -1,12 +1,12 @@
 {
-  "last_sf_poll": "2025-11-18T00:35:49.930109",
-  "total_checks": 195,
-  "total_updates_found": 10,
-  "last_check": "2025-11-18T00:35:49.930109",
-  "last_job_poll": "2025-11-18T00:35:51.963565",
-  "total_job_checks": 193,
-  "total_job_updates_found": 51,
-  "last_estimate_poll": "2025-11-18T00:35:50.942252",
-  "total_estimate_checks": 142,
-  "total_estimate_updates_found": 30
+  "last_sf_poll": "2025-11-25T18:59:16.791750",
+  "total_checks": 327,
+  "total_updates_found": 73,
+  "last_check": "2025-11-25T18:59:16.791750",
+  "last_job_poll": "2025-11-25T18:59:26.476745",
+  "total_job_checks": 323,
+  "total_job_updates_found": 237,
+  "last_estimate_poll": "2025-11-25T18:59:18.236140",
+  "total_estimate_checks": 274,
+  "total_estimate_updates_found": 41
 }
