@@ -929,7 +929,6 @@ async def sync_ghl_to_service_fusion(request: Request):
         # Build job payload (no times, just scheduled status)
         job_payload = {
             "customer_name": customer_name,
-            "description": service_needed,
             "status": "Scheduled",
         }
         job_payload["techs_assigned"] = [
